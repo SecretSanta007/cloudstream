@@ -9,6 +9,8 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.extractorApis
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.actions.VideoClickAction
+import com.lagradost.cloudstream3.actions.VideoClickActionHolder
 
 const val PLUGIN_TAG = "PluginInstance"
 
@@ -34,9 +36,11 @@ abstract class Plugin {
      */
     fun registerMainAPI(element: MainAPI) {
         Log.i(PLUGIN_TAG, "Adding ${element.name} (${element.mainUrl}) MainAPI")
-        element.sourcePlugin = this.__filename
+        element.sourcePlugin = this.filename
         // Race condition causing which would case duplicates if not for distinctBy
-        APIHolder.allProviders.add(element)
+        synchronized(APIHolder.allProviders) {
+            APIHolder.allProviders.add(element)
+        }
         APIHolder.addPluginMapping(element)
     }
 
@@ -46,22 +50,43 @@ abstract class Plugin {
      */
     fun registerExtractorAPI(element: ExtractorApi) {
         Log.i(PLUGIN_TAG, "Adding ${element.name} (${element.mainUrl}) ExtractorApi")
-        element.sourcePlugin = this.__filename
+        element.sourcePlugin = this.filename
         extractorApis.add(element)
     }
 
+    /**
+     * Used to register VideoClickAction instances
+     * @param element VideoClickAction you want to register
+     */
+    fun registerVideoClickAction(element: VideoClickAction) {
+        Log.i(PLUGIN_TAG, "Adding ${element.name} VideoClickAction")
+        element.sourcePlugin = this.filename
+        synchronized(VideoClickActionHolder.allVideoClickActions) {
+            VideoClickActionHolder.allVideoClickActions.add(element)
+        }
+    }
+
     class Manifest {
-        @JsonProperty("name") var name: String? = null
-        @JsonProperty("pluginClassName") var pluginClassName: String? = null
-        @JsonProperty("version") var version: Int? = null
-        @JsonProperty("requiresResources") var requiresResources: Boolean = false
+        @JsonProperty("name")
+        var name: String? = null
+        @JsonProperty("pluginClassName")
+        var pluginClassName: String? = null
+        @JsonProperty("version")
+        var version: Int? = null
+        @JsonProperty("requiresResources")
+        var requiresResources: Boolean = false
     }
 
     /**
      * This will contain your resources if you specified requiresResources in gradle
      */
     var resources: Resources? = null
-    var __filename: String? = null
+    /** Full file path to the plugin. */
+    @Deprecated("Renamed to `filename` to follow conventions", replaceWith = ReplaceWith("filename"))
+    var __filename: String?
+        get() = filename
+        set(value) {filename = value}
+    var filename: String? = null
 
     /**
      * This will add a button in the settings allowing you to add custom settings
